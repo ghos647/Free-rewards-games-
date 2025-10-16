@@ -1,0 +1,59 @@
+/* Tailwind Configuration Override for Custom Fonts
+    This block defines CSS variables for the fonts.
+*/
+:root {
+    --font-sans: 'Montserrat', sans-serif;
+    --font-title: 'Playfair Display', serif;
+}
+
+/* Base Body Styles */
+body {
+    /* Set Montserrat as the clean default font */
+    font-family: var(--font-sans);
+    background-color: #0c0e18; /* Very dark background */
+    padding: 25px; 
+}
+
+/* Special class for rich titles (Playfair Display) */
+.title-font {
+    font-family: var(--font-title);
+}
+
+/* Unused class from original snippet (optional to keep) */
+.title {
+	color: #5C6AC4;
+}
+
+/* Card styles for depth */
+.card {
+    box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease;
+}
+
+/* Progress Bar Animation */
+.progress-bar {
+    transition: width 0.3s ease-in-out;
+}
+
+/* Gradient Button Styles */
+.gradient-button {
+    background-image: linear-gradient(to right, #a855f7, #6366f1, #3b82f6);
+    transition: all 0.2s;
+}
+
+.gradient-button:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(168, 85, 247, 0.4);
+}
+
+.gradient-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* High Security Checkpoint Box */
+.security-box {
+    background-color: #1f2937; /* Slightly lighter than the card for contrast */
+    border: 2px solid #f97316; /* Bold orange border for attention */
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.7); /* Subtle golden glow */
+}
