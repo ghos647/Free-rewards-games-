@@ -1,0 +1,336 @@
+// --- Core Application State and Logic ---
+
+let gameState = 0; // 0: Gate, 1: Ads, 2: Reward Choice, 3: Submission
+
+// Stage 0 - Gate Requirements (Share/Like)
+let sharesNeeded = 10;
+let likesNeeded = 4;
+let shareCount = 0;
+let likeCount = 0;
+let isConfirmed = false;
+
+// Stage 1 - Ad Watching Requirements
+let watchStepsNeeded = 20;
+let watchProgress = 0;
+let isAdLinkVisited = false; // Security Flag
+
+// Custom Ad Link List (20 links)
+const URL_A = 'https://www.effectivegatecpm.com/dyg05bv8?key=51a07bb7beb6500c65911d62796f2a48';
+const URL_B = 'https://www.effectivegatecpm.com/snja9fbd5?key=53302d5b35e8c2d701e2bc3b5bafede1';
+
+const adLinks = [
+    // Block 1 (4 ads: URL_A, URL_B, URL_A, URL_A)
+    URL_A, URL_B, URL_A, URL_A,
+
+    // Block 2 (4 ads: URL_B, URL_B, URL_B, URL_A)
+    URL_B, URL_B, URL_B, URL_A,
+
+    // Remaining 12 ads (rotating the two main links to complete 20)
+    URL_A, URL_B, URL_A, URL_B,
+    URL_A, URL_B, URL_A, URL_B,
+    URL_A, URL_B, URL_A, URL_B,
+];
+
+// User's target post link
+const targetPostLink = 'https://www.facebook.com/share/p/1Gxn2XygCC/';
+
+// Reward options
+const rewards = {
+    package1: { likes: 20, comments: 8, shares: 100, posts: 1 },
+    package2: { likes: 10, comments: 4, shares: 50, posts: 2 }
+};
+
+let selectedPackage = null;
+
+// --- Utility Functions ---
+
+/** Renders the current view based on the gameState. */
+function render() {
+    const container = document.getElementById('stage-container');
+    let content = '';
+
+    switch (gameState) {
+        case 0:
+            content = renderGateStage();
+            break;
+        case 1:
+            content = renderAdWatchStage();
+            break;
+        case 2:
+            content = renderRewardChoiceStage();
+            break;
+        case 3:
+            content = renderSubmissionStage();
+            break;
+        default:
+            content = `<p class="text-center text-red-400">Demo error. Reloading...</p>`;
+    }
+    container.innerHTML = content;
+    attachListeners();
+}
+
+/** Attaches event listeners specific to the current stage. */
+function attachListeners() {
+    if (gameState === 0) {
+        document.getElementById('share-btn')?.addEventListener('click', updateGateProgress.bind(null, 'share'));
+        document.getElementById('like-btn')?.addEventListener('click', updateGateProgress.bind(null, 'like'));
+        document.getElementById('security-confirm')?.addEventListener('change', (e) => {
+            isConfirmed = e.target.checked;
+            render();
+        });
+    } else if (gameState === 1) {
+        // Attach listener for the ad completion button
+        document.getElementById('watch-btn')?.addEventListener('click', updateWatchProgress);
+        // Attach listener for the ad link click to mark as visited
+        document.getElementById('visit-ad-btn')?.addEventListener('click', markAdAsVisited);
+    } else if (gameState === 2) {
+        document.getElementById('select-pkg-1')?.addEventListener('click', () => selectReward(1));
+        document.getElementById('select-pkg-2')?.addEventListener('click', () => selectReward(2));
+    } else if (gameState === 3) {
+        document.getElementById('submit-btn')?.addEventListener('click', submitPostLink);
+    }
+}
+
+// --- Stage 0: Sharing & Liking Gate ---
+
+function renderGateStage() {
+    const isRequirementsMet = shareCount >= sharesNeeded && likeCount >= likesNeeded;
+    const isUnlocked = isRequirementsMet && isConfirmed;
+    return `
+        <h2 class="text-3xl font-bold mb-4 text-white">Step 1: Engagement Gate</h2>
+        <p class="text-base text-gray-400 mb-6">You must share the campaign with **${sharesNeeded} groups/people** and secure **${likesNeeded} likes/good comments** from real friends to proceed.</p>
+
+        <div class="space-y-4 mb-8">
+            <div class="p-3 bg-gray-800 rounded-lg border border-blue-600">
+                <p class="font-semibold text-blue-400">Shares Completed: ${shareCount}/${sharesNeeded}</p>
+                <div class="h-2 bg-gray-700 rounded-full mt-1">
+                    <div class="progress-bar h-2 bg-blue-500 rounded-full" style="width: ${Math.min(100, (shareCount / sharesNeeded) * 100)}%;"></div>
+                </div>
+                <button id="share-btn" class="mt-3 w-full text-sm py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-600 transition" ${shareCount >= sharesNeeded ? 'disabled' : ''}>
+                    Simulate Share (${shareCount + 1})
+                </button>
+            </div>
+
+            <div class="p-3 bg-gray-800 rounded-lg border border-red-600">
+                <p class="font-semibold text-red-400">Likes/Comments Received: ${likeCount}/${likesNeeded}</p>
+                <div class="h-2 bg-gray-700 rounded-full mt-1">
+                    <div class="progress-bar h-2 bg-red-500 rounded-full" style="width: ${Math.min(100, (likeCount / likesNeeded) * 100)}%;"></div>
+                </div>
+                <button id="like-btn" class="mt-3 w-full text-sm py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 transition" ${likeCount >= likesNeeded ? 'disabled' : ''}>
+                    Simulate Friend's Like/Comment (${likeCount + 1})
+                </button>
+            </div>
+        </div>
+
+        <div class="security-box p-6 rounded-xl mb-6 text-white text-lg">
+            <p class="font-extrabold text-2xl text-yellow-300 mb-4 title-font">🚨 HIGH SECURITY CHECKPOINT</p>
+            <div class="flex items-start">
+                <input id="security-confirm" type="checkbox" class="h-6 w-6 rounded border-gray-300 text-purple-500 focus:ring-purple-500 bg-gray-700 mt-1" ${isConfirmed ? 'checked' : ''} ${!isRequirementsMet ? 'disabled' : ''}>
+                <label for="security-confirm" class="ml-4 font-semibold text-gray-200 leading-snug">
+                    **CRITICAL NOTICE:** I confirm I have completely fulfilled the above requirements with **real human engagement** and have the **screenshots/proof** ready. I understand providing false proof will lead to an immediate ban.
+                </label>
+            </div>
+        </div>
+
+
+        <button id="next-btn" onclick="nextStage()" class="gradient-button w-full text-white font-semibold py-3 rounded-xl mt-6" ${isUnlocked ? '' : 'disabled'}>
+            ${isUnlocked ? 'CONFIRM & PROCEED to Task 2' : 'Complete All Requirements and Check the Box to Unlock'}
+        </button>
+    `;
+}
+
+function updateGateProgress(type) {
+    // New logic: Open the external link on every click
+    window.open(targetPostLink, '_blank');
+
+    if (type === 'share' && shareCount < sharesNeeded) {
+        shareCount++;
+    } else if (type === 'like' && likeCount < likesNeeded) {
+        likeCount++;
+    }
+    // Reset confirmation to force user to check the box again if they just made progress
+    isConfirmed = false;
+    render();
+}
+
+// --- Stage 1: Sequential Ad Watching Task ---
+
+function renderAdWatchStage() {
+    const isComplete = watchProgress >= watchStepsNeeded;
+    const percentage = (watchProgress / watchStepsNeeded) * 100;
+    const currentAdNumber = watchProgress + 1;
+    const currentAdUrl = adLinks[watchProgress];
+
+    const adLinkSection = isComplete ?
+        '' :
+        `
+        <div class="p-4 bg-gray-700 rounded-lg border border-indigo-600 mb-6">
+            <p class="font-semibold text-indigo-400 text-lg mb-2">Current Ad Link (Step ${currentAdNumber}/${watchStepsNeeded}):</p>
+            <a href="${currentAdUrl}" target="_blank" class="block text-sm break-all text-blue-400 hover:text-blue-300 transition duration-150 p-2 bg-gray-800 rounded-md">
+                ${currentAdUrl}
+            </a>
+        </div>
+
+        <a id="visit-ad-btn" href="${currentAdUrl}" target="_blank" class="w-full inline-block text-center gradient-button text-white font-semibold py-3 rounded-xl mb-4">
+            VISIT AD NOW (Opens in New Tab)
+        </a>
+
+        <button id="watch-btn" class="w-full text-base py-3 text-white rounded-xl bg-green-700 hover:bg-green-600 transition disabled:opacity-50" ${isAdLinkVisited ? '' : 'disabled'}>
+            I HAVE COMPLETED THIS AD STEP (${currentAdNumber}/${watchStepsNeeded})
+        </button>
+        `;
+
+    return `
+        <h2 class="text-3xl font-bold mb-4 text-white">Step 2: Time-Gated Engagement Tasks</h2>
+        <p class="text-base text-gray-400 mb-6">You must complete **${watchStepsNeeded} sequential ad visiting steps** to fully unlock your reward options. Click the link, wait for the full page load, and return to click the completion button.</p>
+
+        <div class="p-4 bg-gray-800 rounded-lg border border-yellow-600 mb-6">
+            <p class="font-semibold text-yellow-400 text-lg">Overall Progress: ${watchProgress}/${watchStepsNeeded}</p>
+            <div class="h-3 bg-gray-700 rounded-full mt-2">
+                <div class="progress-bar h-3 bg-yellow-500 rounded-full" style="width: ${percentage}%;"></div>
+            </div>
+        </div>
+
+        ${adLinkSection}
+
+        <button id="next-btn" onclick="nextStage()" class="w-full text-base py-3 text-indigo-400 rounded-xl mt-4 border-2 border-indigo-700 hover:bg-indigo-900 transition" ${isComplete ? '' : 'disabled'}>
+            ${isComplete ? 'PROCEED to Reward Selection' : 'Finish All 20 Ad Tasks to Continue'}
+        </button>
+    `;
+}
+
+// Function to mark the link as visited and enable the completion button
+function markAdAsVisited() {
+    isAdLinkVisited = true;
+    // Use a slight delay to ensure the browser registers the click before re-rendering
+    setTimeout(render, 50);
+}
+
+function updateWatchProgress() {
+    if (watchProgress < watchStepsNeeded && isAdLinkVisited) {
+        watchProgress++;
+        isAdLinkVisited = false; // Reset flag for the next step, forcing a new click
+    }
+    render();
+}
+
+// --- Stage 2: Reward Selection ---
+
+function renderRewardChoiceStage() {
+    const selectedClass = "ring-4 ring-offset-2 ring-purple-500 border-purple-500 bg-gray-800";
+    const unselectedClass = "border-gray-700 hover:border-indigo-500 bg-gray-800";
+
+    // Helper to render a package card
+    const renderPackage = (pkg, number) => {
+        const isSelected = selectedPackage === pkg;
+        return `
+            <div id="select-pkg-${number}" class="card p-5 border-2 rounded-xl cursor-pointer transition ${isSelected ? selectedClass : unselectedClass}">
+                <h3 class="text-2xl font-bold mb-2 ${isSelected ? 'text-purple-400' : 'text-white'} title-font">Package ${number}</h3>
+                <p class="text-sm font-medium text-gray-400">${pkg.posts} Post${pkg.posts > 1 ? 's' : ''} Boost</p>
+                <ul class="text-sm list-disc pl-5 mt-3 space-y-1 text-gray-400">
+                    <li><strong class="text-green-400">${pkg.likes * pkg.posts}</strong> Total Likes</li>
+                    <li><strong class="text-green-400">${pkg.comments * pkg.posts}</strong> Total Comments</li>
+                    <li><strong class="text-green-400">${pkg.shares * pkg.posts}</strong> Total Shares</li>
+                </ul>
+                <p class="text-xs mt-2 text-indigo-400">${pkg.posts === 1 ? 'One single post receives the full boost.' : 'Boost split evenly across 2 posts.'}</p>
+            </div>
+        `;
+    };
+
+    return `
+        <h2 class="text-3xl font-bold mb-6 text-white">Step 3: Select Your Reward Tier</h2>
+        <p class="text-base text-gray-400 mb-6">Choose one of the two verified reward packages:</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ${renderPackage(rewards.package1, 1)}
+            ${renderPackage(rewards.package2, 2)}
+        </div>
+
+        <button id="next-btn" onclick="nextStage()" class="gradient-button w-full text-white font-semibold py-3 rounded-xl mt-6" ${selectedPackage ? '' : 'disabled'}>
+            ${selectedPackage ? `CONFIRM PACKAGE ${selectedPackage.posts === 1 ? '1' : '2'}` : 'Select a Package to Continue'}
+        </button>
+    `;
+}
+
+function selectReward(packageNumber) {
+    selectedPackage = packageNumber === 1 ? rewards.package1 : rewards.package2;
+    render();
+}
+
+// --- Stage 3: Submission & Final Message ---
+
+function renderSubmissionStage() {
+    if (!selectedPackage) {
+        gameState = 2;
+        render();
+        return '';
+    }
+    const packageNumber = selectedPackage === rewards.package1 ? 1 : 2;
+    const packageInfo = `Package ${packageNumber}`;
+
+    return `
+        <h2 class="text-3xl font-bold mb-4 text-white">Step 4: Final Submission & Proof</h2>
+        <p class="text-base text-gray-400 mb-6">You selected: <span class="font-bold text-purple-400">${packageInfo}</span>. Please finalize your submission.</p>
+
+        <div class="p-5 bg-green-900 rounded-lg border-2 border-green-500 mb-6 text-base text-white">
+            <p class="font-bold text-xl text-green-300 mb-3 title-font">ACTION REQUIRED: Send Proof Via FB</p>
+            <ul class="text-sm text-gray-300 list-disc pl-5 space-y-2">
+                <li>**IMMEDIATELY** send us a **message on Facebook** with your full submission proof.</li>
+                <li>Include:
+                    <ol class="list-decimal pl-4 mt-1 space-y-1">
+                        <li>The **Post Link/ID** you want boosted.</li>
+                        <li>The **Screenshots** showing all shares and likes/comments.</li>
+                        <li>Your chosen **Reward Package Number (${packageNumber})**.</li>
+                    </ol>
+                </li>
+                <li>Reward delivery takes **3-7 days** after successful verification.</li>
+                <li>Any attempt to use bad language or fake submissions will result in an immediate block.</li>
+            </ul>
+        </div>
+
+        <label for="post-link" class="block text-sm font-medium text-gray-400 mb-2">Target Post Link/ID:</label>
+        <input type="text" id="post-link" value="${targetPostLink}" readonly class="w-full p-3 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-gray-800 text-white cursor-text">
+        <p class="text-xs text-red-400 mt-1">This is the link that will receive the boost: ${targetPostLink}</p>
+
+        <div id="status-message" class="mt-4 text-center font-semibold hidden"></div>
+
+        <button id="submit-btn" class="gradient-button w-full text-white font-semibold py-3 rounded-xl mt-6">
+            I Have Sent The FB Message & Proof
+        </button>
+    `;
+}
+
+function submitPostLink() {
+    const statusDiv = document.getElementById('status-message');
+
+    statusDiv.className = 'mt-4 text-center font-semibold text-green-400 block';
+    statusDiv.textContent = `Submission Acknowledged! Now wait for the FB team to verify your screenshots. Thank you!`;
+
+    // Disable the button after successful confirmation
+    document.getElementById('submit-btn').disabled = true;
+}
+
+/** Moves the application state to the next stage. */
+function nextStage() {
+    gameState++;
+    render();
+}
+
+// --- Initialization ---
+
+// Configure Tailwind to recognize the custom font families defined in style.css
+window.onload = function() {
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    // Uses the fallback from the CSS variables if needed
+                    'sans': ['Montserrat', 'sans-serif'], 
+                    'title': ['Playfair Display', 'serif'],
+                },
+            }
+        }
+    };
+    // Initialize the application once the DOM is ready
+    render();
+};
